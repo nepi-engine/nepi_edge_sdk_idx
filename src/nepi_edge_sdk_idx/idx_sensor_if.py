@@ -27,8 +27,9 @@ from nepi_edge_sdk_base.save_data_if import SaveDataIF
 from nepi_edge_sdk_base.save_cfg_if import SaveCfgIF
 from nepi_ros_interfaces.msg import IDXStatus, RangeWindow, SaveData, SaveDataRate, SaveDataStatus
 from nepi_ros_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse, NavPoseCapabilitiesQuery, NavPoseCapabilitiesQueryResponse
-from nepi_ros_interfaces.msg import NavPose
+from nepi_ros_interfaces.msg import NavPose, Frame3DTransform
 from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
+from geometry_msgs.msg import Vector3
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_img
@@ -41,7 +42,10 @@ class ROSIDXSensorIF:
     FRAMERATE_MODE_MAX = 3 # LOW, MED, HIGH, MAX
     UPDATE_NAVPOSE_RATE_HZ = 10
     CHECK_SAVE_DATA_RATE_HZ = 40
+
+    ZERO_TRANSFORM = [0,0,0,0,0,0,0]
     
+   
     # Backup Factory Control Values 
     FACTORY_CONTROLS = dict( controls_enable = True,
         auto_adjust = False,
@@ -104,48 +108,24 @@ class ROSIDXSensorIF:
         self.resetFactory()
 
     def resetFactory(self):
-
         self.settings_if.resetFactorySettings()
-
         rospy.set_param('~idx/device_name', self.factory_device_name)
-        self.status_msg.device_name = self.factory_device_name
-
-        rospy.set_param('~idx/auto', self.factory_controls.get('auto_adjust'))
-        self.status_msg.auto_adjust = self.factory_controls.get('auto_adjust')
-        
-        rospy.set_param('~idx/brightness', self.factory_controls.get('brightness_ratio'))
-        self.status_msg.brightness = self.factory_controls.get('brightness_ratio')
-        
+        rospy.set_param('~idx/auto', self.factory_controls.get('auto_adjust'))  
+        rospy.set_param('~idx/brightness', self.factory_controls.get('brightness_ratio'))      
         rospy.set_param('~idx/contrast', self.factory_controls.get('contrast_ratio'))
-        self.status_msg.contrast = self.factory_controls.get('contrast_ratio')
-        
         rospy.set_param('~idx/thresholding', self.factory_controls.get('threshold_ratio'))
-        self.status_msg.thresholding = self.factory_controls.get('threshold_ratio')
-        
         rospy.set_param('~idx/resolution_mode', self.factory_controls.get('resolution_mode'))
-        self.status_msg.resolution_mode = self.factory_controls.get('resolution_mode')
-        
         rospy.set_param('~idx/framerate_mode', self.factory_controls.get('framerate_mode'))
-        self.status_msg.framerate_mode = self.factory_controls.get('framerate_mode')
-
         rospy.set_param('~idx/range_window/start_range_ratio', self.factory_controls.get('start_range_ratio'))
         rospy.set_param('~idx/range_window/stop_range_ratio', self.factory_controls.get('stop_range_ratio'))
-        self.status_msg.range_window.start_range = self.factory_controls.get('start_range_ratio')
-        self.status_msg.range_window.stop_range =  self.factory_controls.get('stop_range_ratio')
-        
+        rospy.set_param('~idx/frame_3d_transform', self.ZERO_TRANSFORM)
         rospy.set_param('~idx/frame_3d', self.factory_controls.get('frame_3d'))
-        self.status_msg.frame_3d = self.factory_controls.get('frame_3d')
-
         self.zoom_ratio = self.init_zoom_ratio
         self.rotate_ratio = self.init_rotate_ratio
         self.tilt_ratio = self.init_rotate_ratio
         self.render_controls = [self.zoom_ratio,self.rotate_ratio,self.tilt_ratio]
-        self.status_msg.zoom = self.zoom_ratio
-        self.status_msg.rotate = self.rotate_ratio
-        self.status_msg.tilt = self.tilt_ratio
-        self.updateAndPublishStatus(do_updates=False)
-
         self.updateFromParamServer()
+        self.publishStatus()
 
     def updateDeviceNameCb(self, msg):
         #rospy.loginfo(msg)
@@ -163,7 +143,7 @@ class ROSIDXSensorIF:
         else:
             rospy.set_param('~idx/device_name', new_device_name)
             self.status_msg.device_name = new_device_name
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here 
+        self.publishStatus(do_updates=False) # Updated inline here 
         self.device_save_config_pub.publish(Empty())
 
 
@@ -175,55 +155,83 @@ class ROSIDXSensorIF:
     def resetDeviceName(self):
         rospy.set_param('~idx/device_name', self.factory_device_name)
         self.status_msg.device_name = self.factory_device_name
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here 
+        self.publishStatus(do_updates=False) # Updated inline here 
         self.device_save_config_pub.publish(Empty())
 
 
     def resetControlsCb(self, msg):
         rospy.loginfo(msg)
         rospy.loginfo("Resetting IDX Sensor Controls")
-        self.resetControls()
+        self.resetParamServer()
 
-    def resetControls(self):
-        rospy.set_param('~idx/auto', self.init_auto_adjust)
-        self.status_msg.auto_adjust = self.init_auto_adjust
-        
+    def resetParamServer(self,do_updates = True):
+        rospy.set_param('~idx/device_name', self.init_device_name)
+        rospy.set_param('~idx/auto', self.init_auto_adjust)       
         rospy.set_param('~idx/brightness', self.init_brightness_ratio)
-        self.status_msg.brightness = self.init_brightness_ratio
-        
-        rospy.set_param('~idx/contrast', self.init_contrast_ratio)
-        self.status_msg.contrast = self.init_contrast_ratio
-        
+        rospy.set_param('~idx/contrast', self.init_contrast_ratio)        
         rospy.set_param('~idx/thresholding', self.init_threshold_ratio)
-        self.status_msg.thresholding = self.init_threshold_ratio
-        
-        rospy.set_param('~idx/resolution_mode', self.init_resolution_mode)
-        self.status_msg.resolution_mode = self.init_resolution_mode
-        
+        rospy.set_param('~idx/resolution_mode', self.init_resolution_mode)   
         rospy.set_param('~idx/framerate_mode', self.init_framerate_mode)
-        self.status_msg.framerate_mode = self.init_framerate_mode
-
         rospy.set_param('~idx/range_window/start_range_ratio', self.init_start_range_ratio)
         rospy.set_param('~idx/range_window/stop_range_ratio', self.init_stop_range_ratio)
-        self.status_msg.min_range_m = self.init_min_range_m
-        self.status_msg.max_range_m = self.init_max_range_m
-        
+        rospy.set_param('~idx/frame_3d_transform', self.init_frame_3d_transform)
         rospy.set_param('~idx/frame_3d', self.init_frame_3d)
-        self.status_msg.frame_3d = self.init_frame_3d
-
         self.zoom_ratio = self.init_zoom_ratio
         self.rotate_ratio = self.init_rotate_ratio
         self.tilt_ratio = self.init_rotate_ratio
         self.render_controls = [self.zoom_ratio,self.rotate_ratio,self.tilt_ratio]
-        self.status_msg.zoom = self.zoom_ratio
-        self.status_msg.rotate = self.rotate_ratio
-        self.status_msg.tilt = self.tilt_ratio
-        self.updateAndPublishStatus(do_updates=False)
+        if do_updates:
+            self.updateFromParamServer()
+            self.publishStatus()
 
+    def initializeParamServer(self,do_updates = True):
+        self.init_device_name = rospy.get_param('~idx/device_name', self.factory_device_name)
+        self.init_controls_enable = rospy.get_param('~idx/controls_enable',  self.factory_controls["controls_enable"])
+        self.init_auto_adjust = rospy.get_param('~idx/auto',  self.factory_controls["auto_adjust"])
+        self.init_brightness_ratio = rospy.get_param('~idx/brightness',  self.factory_controls["brightness_ratio"])
+        self.init_contrast_ratio = rospy.get_param('~idx/contrast',  self.factory_controls["contrast_ratio"])
+        self.init_threshold_ratio = rospy.get_param('~idx/thresholding',  self.factory_controls["threshold_ratio"])
+        self.init_resolution_mode = rospy.get_param('~idx/resolution_mode',  self.factory_controls["resolution_mode"])
+        self.init_framerate_mode = rospy.get_param('~idx/framerate_mode',  self.factory_controls["framerate_mode"])
 
-        self.updateFromParamServer()
+        self.init_start_range_ratio = rospy.get_param('~idx/range_window/start_range_ratio',  self.factory_controls["start_range_ratio"])
+        self.init_stop_range_ratio = rospy.get_param('~idx/range_window/stop_range_ratio', self.factory_controls["stop_range_ratio"])
+        self.init_min_range_m = rospy.get_param('~idx/range_limits/min_range_m',  self.factory_controls["min_range_m"])
+        self.init_max_range_m = rospy.get_param('~idx/range_limits/max_range_m',  self.factory_controls["max_range_m"])
 
+        self.init_frame_3d_transform = rospy.get_param('~idx/frame_3d_transform', self.ZERO_TRANSFORM)
 
+        if self.factory_controls["frame_3d"] is None:
+            self.init_frame_3d = rospy.get_param('~idx/frame_3d',  'nepi_center_frame')
+        else:
+            self.init_frame_3d = rospy.get_param('~idx/frame_3d',  self.factory_controls["frame_3d"] )
+
+        self.init_zoom_ratio = self.zoom_ratio
+        self.init_rotate_ratio = self.rotate_ratio
+        self.init_tilt_ratio = self.rotate_ratio
+        self.resetParamServer(do_updates)
+
+    def updateFromParamServer(self):
+        param_dict = rospy.get_param('~idx', {})
+        #rospy.logwarn("Debugging: param_dict = " + str(param_dict))
+        if self.settings_if is not None:
+            self.settings_if.updateFromParamServer()
+        if (self.setControlsEnable is not None and 'controls_enable' in param_dict):
+            self.setControlsEnable(param_dict['controls_enable'])
+        if (self.setAutoAdjust is not None and 'auto_adjust' in param_dict):
+            self.setAutoAdjust(param_dict['auto_adjust'])
+        if (self.setBrightness is not None and 'brightness' in param_dict):
+            self.setBrightness(param_dict['brightness'])
+        if (self.setContrast is not None and 'contrast' in param_dict):
+            self.setContrast(param_dict['contrast'])
+        if (self.setThresholding is not None and 'thresholding' in param_dict):
+            self.setThresholding(param_dict['thresholding'])
+        if (self.setResolutionMode is not None and 'resolution_mode' in param_dict):
+            self.setResolutionMode(param_dict['resolution_mode'])
+        if (self.setFramerateMode is not None and 'framerate_mode' in param_dict):
+            self.setFramerateMode(param_dict['framerate_mode'])
+        if (self.setRange is not None and 'start_range' in param_dict and 'stop_range' in param_dict):
+            self.setRange(param_dict['range_window']['start_range'], param_dict['range_window']['stop_range'])
 
     # Define local IDX Control callbacks
     def setControlsEnableCb(self, msg):
@@ -236,7 +244,7 @@ class ROSIDXSensorIF:
             if status is True:
                 rospy.set_param('~idx/controls_enable', new_controls_enable)
                 self.status_msg.controls_enable = new_controls_enable
-                self.updateAndPublishStatus(do_updates=False) # Updated inline here
+                self.publishStatus(do_updates=False) # Updated inline here
                 if new_controls_enable:
                     rospy.loginfo("Enabling IDX Controls")
                 else:
@@ -254,7 +262,7 @@ class ROSIDXSensorIF:
                     self.updateFromParamServer()
         else:
             rospy.loginfo("Ignoring set controls_enable.  Driver has no setControlsEnable function")
-            self.updateAndPublishStatus(do_updates=False) # Updated inline here
+            self.publishStatus(do_updates=False) # Updated inline here
 
             
     def setAutoAdjustCb(self, msg):
@@ -277,7 +285,7 @@ class ROSIDXSensorIF:
                         rospy.loginfo("Disabling IDX Auto Adjust")
                 else:
                     rospy.logerr("Failed to update auto adjust: " + err_str)
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here
+        self.publishStatus(do_updates=False) # Updated inline here
 
 
 
@@ -303,7 +311,7 @@ class ROSIDXSensorIF:
                             self.status_msg.brightness = new_brightness
                         else:
                             rospy.logerr("Failed to update brightness: " + err_str)
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here
+        self.publishStatus(do_updates=False) # Updated inline here
 
     def setContrastCb(self, msg):
         new_contrast = msg.data
@@ -318,7 +326,7 @@ class ROSIDXSensorIF:
                 else:
                     if (new_contrast < 0.0 and new_contrast != -1.0) or (new_contrast > 1.0):
                         rospy.logerr("Contrast value out of bounds")
-                        self.updateAndPublishStatus(do_updates=False) # No change
+                        self.publishStatus(do_updates=False) # No change
                         return
                     else:
                         # Call the parent's method and update ROS param as necessary
@@ -329,7 +337,7 @@ class ROSIDXSensorIF:
                             self.status_msg.contrast = new_contrast
                         else:
                             rospy.logerr("Failed to update contrast: " + err_str)
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here
+        self.publishStatus(do_updates=False) # Updated inline here
 
 
     def setThresholdingCb(self, msg):
@@ -345,7 +353,7 @@ class ROSIDXSensorIF:
                 else:
                     if (new_thresholding < 0.0 or new_thresholding > 1.0):
                         rospy.logerr("Thresholding value out of bounds")
-                        self.updateAndPublishStatus(do_updates=False) # No change
+                        self.publishStatus(do_updates=False) # No change
                         return
                     else:
                         # Call the parent's method and update ROS param as necessary
@@ -356,7 +364,7 @@ class ROSIDXSensorIF:
                             self.status_msg.thresholding = new_thresholding
                         else:
                             rospy.logerr("Failed to update thresholding: " + err_str)
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here
+        self.publishStatus(do_updates=False) # Updated inline here
 
     def setResolutionModeCb(self, msg):
         new_resolution = msg.data
@@ -368,7 +376,7 @@ class ROSIDXSensorIF:
             else:
                 if (new_resolution > self.RESOLUTION_MODE_MAX):
                         rospy.logerr("Resolution mode value out of bounds")
-                        self.updateAndPublishStatus(do_updates=False) # No change
+                        self.publishStatus(do_updates=False) # No change
                         return
                 else:
                     # Call the parent's method and update ROS param as necessary
@@ -379,7 +387,7 @@ class ROSIDXSensorIF:
                         self.status_msg.resolution_mode = new_resolution
                     else:
                         rospy.logerr("Failed to update resolution: " + err_str)
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here
+        self.publishStatus(do_updates=False) # Updated inline here
 
 
         
@@ -393,7 +401,7 @@ class ROSIDXSensorIF:
             else:
                 if (new_framerate > self.FRAMERATE_MODE_MAX):
                     rospy.logerr("Framerate mode value out of bounds")
-                    self.updateAndPublishStatus(do_updates=False) # No change
+                    self.publishStatus(do_updates=False) # No change
                     return
                 else:
                     # Call the parent's method and update ROS param as necessary
@@ -404,7 +412,7 @@ class ROSIDXSensorIF:
                         self.status_msg.framerate_mode = new_framerate
                     else:
                         rospy.logerr("Failed to update framerate: " + err_str)
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here
+        self.publishStatus(do_updates=False) # Updated inline here
 
  
     def setRangeCb(self, msg):
@@ -419,7 +427,7 @@ class ROSIDXSensorIF:
             else:
                 if (new_start_range_ratio < 0 or new_stop_range_ratio > 1 or new_stop_range_ratio < new_start_range_ratio):
                     rospy.logerr("Range values out of bounds")
-                    self.updateAndPublishStatus(do_updates=False) # No change
+                    self.publishStatus(do_updates=False) # No change
                     return
                 else:
                     # Call the parent's method and update ROS param as necessary
@@ -432,44 +440,60 @@ class ROSIDXSensorIF:
                         self.status_msg.range_window.stop_range = new_stop_range_ratio
                     else:
                         rospy.logerr("Failed to update framerate: " + err_str)
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here       
+        self.publishStatus(do_updates=False) # Updated inline here       
 
     def setZoomCb(self, msg):
         new_zoom = msg.data
         if (new_zoom < 0.0 and new_zoom != -1.0) or (new_zoom > 1.0):
             rospy.logerr("Zoom value out of bounds")
-            self.updateAndPublishStatus(do_updates=False) # No change
+            self.publishStatus(do_updates=False) # No change
             return
         else:
             self.zoom_ratio = new_zoom
             self.status_msg.zoom = new_zoom
             self.render_controls[0] = new_zoom
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here
+        self.publishStatus(do_updates=False) # Updated inline here
 
     def setRotateCb(self, msg):
         new_rotate = msg.data
         if (new_rotate < 0.0 and new_rotate != -1.0) or (new_rotate > 1.0):
             rospy.logerr("rotate value out of bounds")
-            self.updateAndPublishStatus(do_updates=False) # No change
+            self.publishStatus(do_updates=False) # No change
             return
         else:
             self.rotate_ratio = new_rotate
             self.status_msg.rotate = new_rotate
             self.render_controls[1] = new_rotate
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here  
+        self.publishStatus(do_updates=False) # Updated inline here  
 
     def setTiltCb(self, msg):
         new_tilt = msg.data
         if (new_tilt < 0.0 and new_tilt != -1.0) or (new_tilt > 1.0):
             rospy.logerr("tilt value out of bounds")
-            self.updateAndPublishStatus(do_updates=False) # No change
+            self.publishStatus(do_updates=False) # No change
             return
         else:
             self.tilt_ratio = new_tilt
             self.status_msg.tilt = new_tilt
             self.render_controls[2] = new_tilt
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here  
+        self.publishStatus(do_updates=False) # Updated inline here  
 
+    def setFrame3dTransformCb(self, msg):
+        new_transform_msg = msg
+        self.setFrame3dTransform(new_transfrom)
+
+    def setFrame3dTransform(self, transform_msg):
+        x = transform_msg.translate_vector.x
+        y = transform_msg.translate_vector.y
+        z = transform_msg.translate_vector.z
+        roll = transform_msg.rotate_vector.x
+        pitch = transform_msg.rotate_vector.y
+        yaw = transform_msg.rotate_vector.z
+        heading = transform_msg.heading_offset
+        transform = [x,y,z,roll,pitch,yaw,heading]
+        self.init_frame_3d_transform = rospy.set_param('~idx/frame_3d_transform',  transform)
+        self.status_msg.frame_3d_transfrom = transform_msg
+        self.publishStatus(do_updates=False) # Updated inline here 
 
     def setFrame3dCb(self, msg):
         new_frame_3d = msg.data
@@ -478,29 +502,7 @@ class ROSIDXSensorIF:
     def setFrame3d(self, new_frame_3d):
         rospy.set_param('~idx/frame_3d', new_frame_3d)
         self.status_msg.frame_3d = new_frame_3d
-        self.updateAndPublishStatus(do_updates=False) # Updated inline here 
-
-    def updateFromParamServer(self):
-        param_dict = rospy.get_param('~idx', {})
-        #rospy.logwarn("Debugging: param_dict = " + str(param_dict))
-        self.settings_if.updateFromParamServer()
-        if (self.setControlsEnable is not None and 'controls_enable' in param_dict):
-            self.setControlsEnable(param_dict['controls_enable'])
-        if (self.setAutoAdjust is not None and 'auto_adjust' in param_dict):
-            self.setAutoAdjust(param_dict['auto_adjust'])
-        if (self.setBrightness is not None and 'brightness' in param_dict):
-            self.setBrightness(param_dict['brightness'])
-        if (self.setContrast is not None and 'contrast' in param_dict):
-            self.setContrast(param_dict['contrast'])
-        if (self.setThresholding is not None and 'thresholding' in param_dict):
-            self.setThresholding(param_dict['thresholding'])
-        if (self.setResolutionMode is not None and 'resolution_mode' in param_dict):
-            self.setResolutionMode(param_dict['resolution_mode'])
-        if (self.setFramerateMode is not None and 'framerate_mode' in param_dict):
-            self.setFramerateMode(param_dict['framerate_mode'])
-        if (self.setRange is not None and 'start_range' in param_dict and 'stop_range' in param_dict):
-            self.setRange(param_dict['range_window']['start_range'], param_dict['range_window']['stop_range'])
-        self.setFrame3d(param_dict['frame_3d'])
+        self.publishStatus(do_updates=False) # Updated inline here 
    
     def provide_capabilities(self, _):
         return self.capabilities_report
@@ -508,8 +510,6 @@ class ROSIDXSensorIF:
     def provide_navpose_capabilities(self, _):
         return self.navpose_capabilities_report  
 
-    def setCurrentAsDefault(self):
-        pass # We only use the param server, no member variables to apply to param server
            
     def __init__(self, device_info, capSettings=None, 
                  factorySettings=None, settingUpdateFunction=None, getSettingsFunction=None,
@@ -534,12 +534,6 @@ class ROSIDXSensorIF:
         self.sw_version = device_info["sw_version"]
 
         self.factory_device_name = device_info["sensor_name"] + "_" + device_info["identifier"]
-        self.init_device_name = rospy.get_param('~idx/device_name', self.factory_device_name)
-        rospy.set_param('~idx/device_name', self.init_device_name)
-        rospy.Subscriber('~reset_controls', Empty, self.resetControlsCb, queue_size=1) # start local callback
-
-
-  
 
         # Create the CV bridge. Do this early so it can be used in the threading run() methods below 
         # TODO: Need one per image output type for thread safety?
@@ -556,47 +550,12 @@ class ROSIDXSensorIF:
                 if self.factory_controls.get(control) != None and factoryControls.get(control) != None:
                     self.factory_controls[control] = factoryControls[control]
 
-        self.init_controls_enable = rospy.get_param('~idx/controls_enable',  self.factory_controls["controls_enable"])
-        rospy.set_param('~idx/controls_enable', self.init_controls_enable)
-
-        self.init_auto_adjust = rospy.get_param('~idx/auto',  self.factory_controls["auto_adjust"])
-        rospy.set_param('~idx/auto', self.init_auto_adjust)
-
-        self.init_brightness_ratio = rospy.get_param('~idx/brightness',  self.factory_controls["brightness_ratio"])
-        rospy.set_param('~idx/brightness', self.init_brightness_ratio)
-
-        self.init_contrast_ratio = rospy.get_param('~idx/contrast',  self.factory_controls["contrast_ratio"])
-        rospy.set_param('~idx/contrast', self.init_contrast_ratio)
-
-        self.init_threshold_ratio = rospy.get_param('~idx/thresholding',  self.factory_controls["threshold_ratio"])
-        rospy.set_param('~idx/thresholding', self.init_threshold_ratio) 
-
-        self.init_resolution_mode = rospy.get_param('~idx/resolution_mode',  self.factory_controls["resolution_mode"])
-        rospy.set_param('~idx/resolution_mode', self.init_resolution_mode)
-
-        self.init_framerate_mode = rospy.get_param('~idx/framerate_mode',  self.factory_controls["framerate_mode"])
-        rospy.set_param('~idx/framerate_mode', self.init_framerate_mode)
-
-        if self.factory_controls["frame_3d"] is None:
-            self.init_frame_3d = rospy.get_param('~idx/frame_3d',  'nepi_center_frame')
-        else:
-            self.init_frame_3d = rospy.get_param('~idx/frame_3d',  self.factory_controls["frame_3d"] )
-        rospy.set_param('~idx/frame_3d', self.init_frame_3d)
-        
-
-        self.init_start_range_ratio = rospy.get_param('~idx/range_window/start_range_ratio',  self.factory_controls["start_range_ratio"])
-        rospy.set_param('~idx/range_window/start_range_ratio', self.init_start_range_ratio)
-        self.init_stop_range_ratio = rospy.get_param('~idx/range_window/stop_range_ratio', self.factory_controls["stop_range_ratio"])
-        rospy.set_param('~idx/range_window/stop_range_ratio', self.init_stop_range_ratio)
-        self.init_min_range_m = rospy.get_param('~idx/range_limits/min_range_m',  self.factory_controls["min_range_m"])
-        rospy.set_param('~idx/range_limits/min_range_m', self.init_min_range_m)
-        self.init_max_range_m = rospy.get_param('~idx/range_limits/max_range_m',  self.factory_controls["max_range_m"])
-        rospy.set_param('~idx/range_limits/max_range_m', self.init_max_range_m)
+        self.initializeParamServer(do_updates = False)
 
         # Set up standard IDX parameters with ROS param and subscriptions
         # Defer actually setting these on the camera via the parent callbacks... the parent may need to do some 
         # additional setup/calculation first. Parent can then get these all applied by calling updateFromParamServer()
-       
+
         self.setControlsEnable = setControlsEnable
         if setControlsEnable is not None:
             rospy.Subscriber('~idx/set_controls_enable', Bool, self.setControlsEnableCb, queue_size=1) # start local callback
@@ -650,6 +609,7 @@ class ROSIDXSensorIF:
         else:
             self.capabilities_report.adjustable_range = False
 
+        rospy.Subscriber('~idx/set_frame_3d_transform', Frame3DTransform, self.setFrame3dCb, queue_size=1)
         rospy.Subscriber('~idx/set_frame_3d', String, self.setFrame3dCb, queue_size=1)
 
         rospy.Subscriber('~idx/reset_controls', Empty, self.resetControlsCb, queue_size=1) # start local callback
@@ -756,31 +716,25 @@ class ROSIDXSensorIF:
         # Set up the save data and save cfg i/f and launch saving threads-- Do this before launching aquisition threads so that they can check data_product_should_save() immediately
         self.capabilities_report.data_products = str(self.data_products)
 
-        # Start settings IF and update
+        # Start NEPI IF interfaces
         self.settings_if = SettingsIF(capSettings, factorySettings, settingUpdateFunction, getSettingsFunction)
         self.save_data_if = SaveDataIF(data_product_names = self.data_products)
-
-        # Update save data configuration fom param server
-
-        self.save_cfg_if = SaveCfgIF(updateParamsCallback=self.setCurrentAsDefault, paramsModifiedCallback=self.updateFromParamServer)
+        self.save_cfg_if = SaveCfgIF(updateParamsCallback=self.initializeParamServer, paramsModifiedCallback=self.updateFromParamServer)
 
 
         # Set up additional publishers
         self.status_msg = IDXStatus()
         self.status_pub = rospy.Publisher('~idx/status', IDXStatus, queue_size=1, latch=True)
 
+        # Start capabilities services
+        rospy.Service('~idx/capabilities_query', IDXCapabilitiesQuery, self.provide_capabilities)
+        rospy.Service('~idx/navpose_capabilities_query', NavPoseCapabilitiesQuery, self.provide_navpose_capabilities)
 
+        # Start NavPose Updates
         if getGPSMsg != None or getOdomMsg != None or getHeadingMsg != None:
             rospy.Timer(rospy.Duration(self.update_navpose_interval_sec), self.navposeCb)
 
 
-        self.updateAndPublishStatus()
-
-
-        # Start capabilities services
-        rospy.Service('~idx/capabilities_query', IDXCapabilitiesQuery, self.provide_capabilities)
-        rospy.Service('~idx/navpose_capabilities_query', NavPoseCapabilitiesQuery, self.provide_navpose_capabilities)
-        
         # Launch the acquisition and saving threads
         if (self.getColor2DImg is not None):
             self.color_img_thread.start()
@@ -825,6 +779,12 @@ class ROSIDXSensorIF:
             rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.savePointcloudImgThread)
 
 
+        # Update and Publish Status Message
+        self.publishStatus()
+        ## Initiation Complete
+        rospy.loginfo("Initialization Complete")
+
+    ###############################################################################################
   
     # Image from img_get_function can be CV2 or ROS image.  Will be converted as needed in the thread
     def image_thread_proccess(self,data_product,img_get_function,img_stop_function,img_publisher):
@@ -991,6 +951,7 @@ class ROSIDXSensorIF:
                                                                                                 device_name + "-" + data_product, 'pcd')
                         if os.path.isfile(full_path_filename) is False:
                             nepi_pc.save_pointcloud(o3d_pc,full_path_filename)
+                            self.save_data_if.data_product_snapshot_reset(data_product)
                 eval("self." + data_product + "_lock.release()")
 
                 
@@ -1038,7 +999,7 @@ class ROSIDXSensorIF:
 
     # Function to update and publish status message
 
-    def updateAndPublishStatus(self, do_updates = True):
+    def publishStatus(self, do_updates = True):
         if do_updates is True:
             # TODO: Probably these should be queried from the parent (and through the driver) via explicit callbacks rather than via the param server
             idx_params = rospy.get_param('~idx')
@@ -1063,6 +1024,17 @@ class ROSIDXSensorIF:
             self.status_msg.min_range_m = rospy.get_param('~idx/range_limits/min_range_m',0.0)
             self.status_msg.max_range_m = rospy.get_param('~idx/range_limits/max_range_m',1.0)
             # The transfer frame into which 3D data (pointclouds) are transformed for the pointcloud data topic
+            transform = rospy.get_param('~idx/frame_3d_transform',  self.ZERO_TRANSFORM)
+            transform_msg = Frame3DTransform()
+            transform_msg.translate_vector.x = transform[0]
+            transform_msg.translate_vector.y = transform[1]
+            transform_msg.translate_vector.z = transform[2]
+            transform_msg.rotate_vector.x = transform[3]
+            transform_msg.rotate_vector.y = transform[4]
+            transform_msg.rotate_vector.z = transform[5]
+            transform_msg.heading_offset = transform[6]
+            self.status_msg.frame_3d_transform = transform_msg
+            
             self.status_msg.frame_3d = idx_params['frame_3d'] if 'frame_3d' in idx_params else "nepi_center_frame"
             self.status_msg.zoom = self.zoom_ratio
             self.status_msg.rotate = self.rotate_ratio

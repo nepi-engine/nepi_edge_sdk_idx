@@ -100,7 +100,9 @@ class ROSIDXSensorIF:
     save_cfg_if = None
 
     update_navpose_interval_sec = float(1)/UPDATE_NAVPOSE_RATE_HZ
-
+    last_gps_timestamp = None
+    last_odom_timestamp = None
+    last_heading_timestamp = None
 
     def resetFactoryCb(self, msg):
         rospy.loginfo(msg)
@@ -984,18 +986,22 @@ class ROSIDXSensorIF:
         if self.getGPSMsg != None:
             gps_msg = self.getGPSMsg()
             if gps_msg is not None:
-                self.idx_navpose_gps_pub.publish(gps_msg)
-
+                if gps_msg.header.stamp != self.last_gps_timestamp:
+                    self.idx_navpose_gps_pub.publish(gps_msg)
+                    self.last_gps_timestamp = gps_msg.header.stamp
         if self.getOdomMsg != None:
             odom_msg = self.getOdomMsg()
             if odom_msg is not None:
-                self.idx_navpose_odom_pub.publish(odom_msg)
+                if odom_msg.header.stamp != self.last_odom_timestamp:
+                    self.idx_navpose_odom_pub.publish(odom_msg)
+                    self.last_odom_timestamp = odom_msg.header.stamp
 
         if self.getHeadingMsg != None:
             heading_msg = self.getHeadingMsg()
             if heading_msg is not None:
-                self.idx_navpose_gps_pub.publish(heading_msg)   
-
+                if heading_msg.header.stamp != self.last_heading_timestamp:
+                    self.idx_navpose_gps_pub.publish(heading_msg)   
+                    self.last_heading_timestamp = heading_msg.header.stamp
 
     # Function to update and publish status message
 

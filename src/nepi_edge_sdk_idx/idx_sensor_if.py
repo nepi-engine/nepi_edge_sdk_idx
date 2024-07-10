@@ -41,7 +41,7 @@ class ROSIDXSensorIF:
     RESOLUTION_MODE_MAX = 3 # LOW, MED, HIGH, MAX
     FRAMERATE_MODE_MAX = 3 # LOW, MED, HIGH, MAX
     UPDATE_NAVPOSE_RATE_HZ = 10
-    CHECK_SAVE_DATA_RATE_HZ = 40
+    CHECK_SAVE_DATA_RATE_HZ = 1
 
     ZERO_TRANSFORM = [0,0,0,0,0,0,0]
     
@@ -743,42 +743,49 @@ class ROSIDXSensorIF:
             self.color_2d_image = None
             self.color_2d_image_timestamp = None
             self.color_2d_image_lock = threading.Lock()
-            rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveColorImgThread)
+            self.color_2d_image_ready = False
+            #rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveColorImgThread)
 
         if (self.getBW2DImg is not None):
             self.bw_img_thread.start()
             self.bw_2d_image = None
             self.bw_2d_image_timestamp = None
             self.bw_2d_image_lock = threading.Lock()
-            rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveBWImgThread)
+            self.bw_2d_image_ready = False
+            #rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveBWImgThread)
 
         if (self.getDepthMap is not None):
             self.depth_map_thread.start()
             self.depth_map = None
             self.depth_map_timestamp = None
             self.depth_map_lock = threading.Lock()
-            rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveDepthMapThread)
+            self.depth_map_ready = False
+            #rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveDepthMapThread)
         
         if (self.getDepthImg is not None):
             self.depth_img_thread.start()
             self.depth_image = None
             self.depth_image_timestamp = None
             self.depth_image_lock = threading.Lock()
-            rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveDepthImgThread)
+            self.depth_image_ready = False
+            #rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.saveDepthImgThread)
         
         if (self.getPointcloud is not None):
             self.pointcloud_thread.start()
             self.pointcloud = None
             self.pointcloud_timestamp = None
             self.pointcloud_lock = threading.Lock()
-            rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.savePointcloudThread)
+            self.pointcloud_ready = False
+            #rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.savePointcloudThread)
 
         if (self.getPointcloudImg is not None):
+            self.pointcloud_img_ready = False
             self.pointcloud_img_thread.start()
             self.pointcloud_image = None
             self.pointcloud_image_timestamp = None
             self.pointcloud_image_lock = threading.Lock()
-            rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.savePointcloudImgThread)
+            self.pointcloud_image_ready = False
+            #rospy.Timer(rospy.Duration(self.check_save_data_interval_sec), self.savePointcloudImgThread)
 
 
         # Update and Publish Status Message
@@ -825,11 +832,17 @@ class ROSIDXSensorIF:
                             cv2_img = image
                         elif isinstance(image,Image): # ROS Image. Convert to CV2 Image
                             cv2_img = nepi_img.rosimg_to_cv2img(image, encoding=encoding)
+                        self.save_img2file(data_product,cv2_img,ros_timestamp)
+                        '''
                         if eval("self." + data_product + "_lock.locked() is False"):
+                            rospy.loginfo("Unlocked")
                             eval("self." + data_product + "_lock.acquire()")
-                            exec("self." + data_product + " = cv2_img")
-                            exec("self." + data_product + "_timestamp = ros_timestamp")
+                            exec("self." + data_product) = cv2_img
+                            exec("self." + data_product + "_timestamp") = ros_timestamp
                             eval("self." + data_product + "_lock.release()")
+                            exec("self." + data_product + "_ready") = True
+                            rospy.loginfo("Set True")
+                        '''
                 elif acquiring is True:
                     if img_stop_function is not None:
                         rospy.loginfo("Stopping " + data_product + " acquisition")
@@ -882,11 +895,15 @@ class ROSIDXSensorIF:
                             o3d_pc = pc
                         elif isinstance(pc,PointCloud2): # ROS Pointcloud. Convert to Open3d pointcloud
                             o3d_pc = nepi_pc.rospc_to_o3dpc(pc)
+                        self.save_pc2file(data_product,o3d_pc,ros_timestamp)
+                        '''
                         if eval("self." + data_product + "_lock.locked() is False"):
                             eval("self." + data_product + "_lock.acquire()")
-                            exec("self." + data_product + " = o3d_pc")
-                            exec("self." + data_product + "_timestamp = ros_timestamp")
+                            exec("self." + data_product)  = o3d_pc
+                            exec("self." + data_product + "_timestamp") = ros_timestamp
                             eval("self." + data_product + "_lock.release()")
+                            exec("self." + data_product + "_ready") = True
+                        '''
                 elif acquiring is True:
                     if pc_stop_function is not None:
                         rospy.loginfo("Stopping " + data_product + " acquisition")
@@ -928,7 +945,17 @@ class ROSIDXSensorIF:
             snapshot_enabled = self.save_data_if.data_product_snapshot_enabled(data_product)
             # Save data if enabled
             if saving_is_enabled or snapshot_enabled:
+                '''
+                data_product_ready = False
+                while(data_product_ready == False):
+                    time.sleep(1)
+                    data_product_ready = exec("self." + data_product + "_ready")
+                    rospy.loginfo("Waiting for " + data_product + "_ready True")
+                    rospy.loginfo(exec(data_product + "_ready"))
                 eval("self." + data_product + "_lock.acquire()")
+                cv2_img = exec("self." + data_product)
+                ros_timestamp = exec("self." + data_product + "_timestamp")
+                '''
                 if cv2_img is not None:
                     device_name = rospy.get_param('~idx/device_name', self.init_device_name)
                     if (self.save_data_if.data_product_should_save(data_product) or snapshot_enabled):
@@ -937,15 +964,25 @@ class ROSIDXSensorIF:
                         if os.path.isfile(full_path_filename) is False:
                             cv2.imwrite(full_path_filename, cv2_img)
                             self.save_data_if.data_product_snapshot_reset(data_product)
-                eval("self." + data_product + "_lock.release()")
+                            #exec("self." + data_product + "_ready") = False
+                #eval("self." + data_product + "_lock.release()")
+                
 
     def save_pc2file(self,data_product,o3d_pc,ros_timestamp):
         if self.save_data_if is not None:
             saving_is_enabled = self.save_data_if.data_product_saving_enabled(data_product)
             snapshot_enabled = self.save_data_if.data_product_snapshot_enabled(data_product)
+            o3d_pc = None
             # Save data if enabled
             if saving_is_enabled or snapshot_enabled:
+                '''
+                data_product_ready = False
+                while(data_product_ready == False):
+                    data_product_ready = exec("self." + data_product + "_ready")
                 eval("self." + data_product + "_lock.acquire()")
+                o3d_pc = exec("self." + data_product)
+                ros_timestamp = exec("self." + data_product + "_timestamp")
+                '''
                 if o3d_pc is not None:
                     device_name = rospy.get_param('~idx/device_name', self.init_device_name)
                     if (self.save_data_if.data_product_should_save(data_product) or snapshot_enabled):
@@ -954,33 +991,34 @@ class ROSIDXSensorIF:
                         if os.path.isfile(full_path_filename) is False:
                             nepi_pc.save_pointcloud(o3d_pc,full_path_filename)
                             self.save_data_if.data_product_snapshot_reset(data_product)
-                eval("self." + data_product + "_lock.release()")
+                            #exec("self." + data_product + "_ready = False")
+                #eval("self." + data_product + "_lock.release()")
 
                 
 
     def saveColorImgThread(self,timer):
         data_product = 'color_2d_image'
-        eval("self.save_img2file(data_product,self." + data_product + ",self." + data_product + "_timestamp)")
+        eval("self.save_img2file(data_product)")
                 
     def saveBWImgThread(self,timer):
         data_product = 'bw_2d_image'
-        eval("self.save_img2file(data_product,self." + data_product + ",self." + data_product + "_timestamp)")
+        eval("self.save_img2file(data_product)")
 
     def saveDepthMapThread(self,timer):
         data_product = 'depth_map'
-        eval("self.save_img2file(data_product,self." + data_product + ",self." + data_product + "_timestamp)")
+        eval("self.save_img2file(data_product)")
 
     def saveDepthImgThread(self,timer):
         data_product = 'depth_image'
-        eval("self.save_img2file(data_product,self." + data_product + ",self." + data_product + "_timestamp)")
+        eval("self.save_img2file(data_product)")
 
     def savePointcloudThread(self,timer):
         data_product = 'pointcloud'
-        eval("self.save_pc2file(data_product,self." + data_product + ",self." + data_product + "_timestamp)")
+        eval("self.save_pc2file(data_product)")
 
     def savePointcloudImgThread(self,timer):
         data_product = 'pointcloud_image'
-        eval("self.save_img2file(data_product,self." + data_product + ",self." + data_product + "_timestamp)")
+        eval("self.save_img2file(data_product)")
 
     def navposeCb(self, timer):
         if self.getGPSMsg != None:

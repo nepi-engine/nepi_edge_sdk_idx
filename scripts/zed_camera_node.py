@@ -94,22 +94,27 @@ class ZedCameraNode(object):
                             serial_number = "",
                             hw_version = "",
                             sw_version = "")
-    
+    color_img_acquire = False
     color_img_msg = None
     color_img_last_stamp = None
     color_img_lock = threading.Lock()
+    bw_img_acquire = False
     bw_img_msg = None
     bw_img_last_stamp = None
     bw_img_lock = threading.Lock()
+    depth_map_acquire = False
     depth_map_msg = None
     depth_map_last_stamp = None
-    depth_map_lock = threading.Lock()    
+    depth_map_lock = threading.Lock() 
+    depth_img_acquire = False   
     depth_img_msg = None
     depth_img_last_stamp = None
-    depth_img_lock = threading.Lock()    
+    depth_img_lock = threading.Lock() 
+    pc_acquire = False   
     pc_msg = None
     pc_last_stamp = None
     pc_lock = threading.Lock()
+    pc_img_acquire = False
     pc_img_msg = None
     pc_img_last_stamp = None
     pc_img_lock = threading.Lock()
@@ -152,10 +157,10 @@ class ZedCameraNode(object):
         # Zed control topics
         # ZED_PARAMETER_UPDATES_TOPIC = ZED_BASE_NAMESPACE + "parameter_updates"
         # Zed data stream topics
-        ZED_COLOR_2D_IMAGE_TOPIC = ZED_BASE_NAMESPACE + "left/image_rect_color"
-        ZED_BW_2D_IMAGE_TOPIC = ZED_BASE_NAMESPACE + "left/image_rect_gray"
-        ZED_DEPTH_MAP_TOPIC = ZED_BASE_NAMESPACE + "depth/depth_registered"
-        ZED_POINTCLOUD_TOPIC = ZED_BASE_NAMESPACE + "point_cloud/cloud_registered"
+        self.color_img_topic = ZED_BASE_NAMESPACE + "left/image_rect_color"
+        self.bw_img_topic = ZED_BASE_NAMESPACE + "left/image_rect_gray"
+        self.depth_map_topic = ZED_BASE_NAMESPACE + "depth/depth_registered"
+        self.pc_topic = ZED_BASE_NAMESPACE + "point_cloud/cloud_registered"
         ZED_ODOM_TOPIC = ZED_BASE_NAMESPACE + "odom"
         ZED_MIN_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/min_depth"
         ZED_MAX_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/max_depth"
@@ -164,16 +169,16 @@ class ZedCameraNode(object):
 
 
         # Wait for zed camera topic to publish, then subscribeCAPS SETTINGS
-        rospy.loginfo("Waiting for topic: " + ZED_COLOR_2D_IMAGE_TOPIC)
-        nepi_ros.wait_for_topic(ZED_COLOR_2D_IMAGE_TOPIC)
+        rospy.loginfo("Waiting for topic: " + self.color_img_topic)
+        nepi_ros.wait_for_topic(self.color_img_topic)
 
         rospy.loginfo("Starting Zed IDX subscribers and publishers")
-        rospy.Subscriber(ZED_COLOR_2D_IMAGE_TOPIC, Image, self.color_2d_image_callback, queue_size = 1)
-        rospy.Subscriber(ZED_BW_2D_IMAGE_TOPIC, Image, self.bw_2d_image_callback, queue_size = 1)
-        rospy.Subscriber(ZED_DEPTH_MAP_TOPIC, Image, self.depth_map_callback, queue_size = 1)
-        rospy.Subscriber(ZED_DEPTH_MAP_TOPIC, Image, self.depth_image_callback, queue_size = 1)
-        rospy.Subscriber(ZED_POINTCLOUD_TOPIC, PointCloud2, self.pointcloud_callback, queue_size = 1)
-        rospy.Subscriber(ZED_POINTCLOUD_TOPIC, PointCloud2, self.pointcloud_image_callback, queue_size = 1)
+        self.color_img_sub = None
+        self.bw_img_sub = None
+        self.depth_map_sub = None
+        self.depth_img_sub = None
+        self.pc_sub = None
+        self.pc_img_sub = None
         rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.idx_odom_topic_callback)
 
         # Launch the ROS node
@@ -482,13 +487,13 @@ class ZedCameraNode(object):
         return status, err_str
 
     
-    def setDriverCameraControl(self, control_name, value):
-        pass # Need to implement
-        #return self.driver.setScaledCameraControl(control_name, value)
-    
+ 
 
     # Good base class candidate - Shared with ONVIF
     def getColorImg(self):
+        if self.color_img_sub == None:
+          self.color_img_sub = rospy.Subscriber(self.color_img_topic, Image, self.color_2d_image_callback, queue_size = 1)
+          time.sleep(0.1)
         # Set process input variables
         data_product = "color_2d_image"
         self.color_img_lock.acquire()
@@ -527,12 +532,20 @@ class ZedCameraNode(object):
     
     # Good base class candidate - Shared with ONVIF
     def stopColorImg(self):
+        self.color_img_lock.acquire()
+        self.color_img_sub.unregister()
+        self.color_img_sub = None
+        self.color_img_msg = None
+        self.color_img_lock.release()
         ret = True
         msg = "Success"
         return ret,msg
     
     # Good base class candidate - Shared with ONVIF
     def getBWImg(self):
+        if self.bw_img_sub == None:
+          self.bw_img_sub =rospy.Subscriber(self.bw_img_topic, Image, self.bw_2d_image_callback, queue_size = 1)
+          time.sleep(0.1)
         # Set process input variables
         data_product = "bw_2d_image"
         self.bw_img_lock.acquire()
@@ -571,11 +584,21 @@ class ZedCameraNode(object):
     
     # Good base class candidate - Shared with ONVIF
     def stopBWImg(self):
-        ret = True
-        msg = "Success"
-        return ret,msg
+      self.bw_img_lock.acquire()
+
+      self.bw_img_sub.unregister()
+      self.bw_img_sub = None
+
+      self.bw_img_msg = None
+      self.bw_img_lock.release()
+      ret = True
+      msg = "Success"
+      return ret,msg
 
     def getDepthMap(self):
+        if self.depth_map_sub == None:
+          self.depth_map_sub =rospy.Subscriber(self.depth_map_topic, Image, self.depth_map_callback, queue_size = 1)
+          time.sleep(0.1)
         # Set process input variables
         data_product = "depth_map"
         self.depth_map_lock.acquire()
@@ -629,11 +652,21 @@ class ZedCameraNode(object):
           return status, msg, img_msg, ros_timestamp, encoding
     
     def stopDepthMap(self):
+        self.depth_map_lock.acquire()
+
+        self.depth_map_sub.unregister()
+        self.depth_map_sub = None
+
+        self.depth_map_msg = None
+        self.depth_map_lock.release()
         ret = True
         msg = "Success"
         return ret,msg
 
     def getDepthImg(self):
+        if self.depth_img_sub == None:
+          self.depth_img_sub =rospy.Subscriber(self.depth_map_topic, Image, self.depth_image_callback, queue_size = 1)
+          time.sleep(0.1)
         # Set process input variables
         data_product = "depth_image"
         self.depth_img_lock.acquire()
@@ -687,6 +720,13 @@ class ZedCameraNode(object):
 
     
     def stopDepthImg(self):
+        self.depth_img_lock.acquire()
+
+        self.depth_img_sub.unregister()
+        self.depth_img_sub = None
+
+        self.depth_img_msg = None
+        self.depth_img_lock.release()
         ret = True
         msg = "Success"
         return ret,msg
@@ -694,6 +734,9 @@ class ZedCameraNode(object):
 
 
     def getPointcloud(self):     
+        if self.pc_sub == None:
+          self.pc_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_callback, queue_size = 1)
+          time.sleep(0.1)
         # Set process input variables
         data_product = "pointcloud"
         self.pc_lock.acquire()
@@ -738,11 +781,21 @@ class ZedCameraNode(object):
 
     
     def stopPointcloud(self):
-        ret = True
-        msg = "Success"
-        return ret,msg
+      self.pc_lock.acquire()
+
+      self.pc_sub.unregister()
+      self.pc_sub = None
+
+      self.pc_msg = None
+      self.pc_lock.release()
+      ret = True
+      msg = "Success"
+      return ret,msg
 
     def getPointcloudImg(self,render_controls=[0.5,0.5,0.5]):     
+        if self.pc_img_sub == None:
+          self.pc_img_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_image_callback, queue_size = 1) 
+          time.sleep(0.1)
         # Set process input variables
         data_product = "pointcloud_image"
         self.pc_img_lock.acquire()
@@ -818,6 +871,13 @@ class ZedCameraNode(object):
 
     
     def stopPointcloudImg(self):
+        self.pc_img_lock.acquire()
+
+        self.pc_img_sub.unregister()
+        self.pc_img_sub = None
+
+        self.pc_img_msg = None
+        self.pc_img_lock.release()
         ret = True
         msg = "Success"
         return ret,msg

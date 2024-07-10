@@ -536,6 +536,9 @@ class V4l2CamDriver(object):
 
   def stopImageAcquisition(self, hold_lock=False):
     self.img_acq_lock.acquire()
+    self.latest_frame = None
+    self.latest_frame_timestamp = None
+    self.latest_frame_success = False
     if self.v4l2_cap == None:
         if not hold_lock:
           self.img_acq_lock.release()

@@ -754,7 +754,7 @@ class ROSIDXSensorIF:
             self.pointcloud_thread.start()
  
         if (self.getPointcloudImg is not None):
-            self.pointcloud_img_ready = False
+           self.pointcloud_img_thread.start()
  
         # Update and Publish Status Message
         self.publishStatus()

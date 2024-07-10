@@ -135,6 +135,7 @@ class ZedCameraNode(object):
 
     img_renderer = None
     img_renderer_mtl = None
+    
 
     def __init__(self):
   

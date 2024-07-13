@@ -44,6 +44,10 @@ from rospy.numpy_msg import numpy_msg
 
 class ZedCameraNode(object):
     DEFAULT_NODE_NAME = "zed_stereo_camera" # zed replaced with zed_type once discovered
+    
+    CAL_SRC_PATH = "/usr/local/zed/settings"
+    USER_CFG_PATH = "/mnt/nepi_storage/user_cfg"
+    CAL_BACKUP_PATH = USER_CFG_PATH + "/zed_cals"
 
     CAP_SETTINGS = [["Float","pub_frame_rate","0.1","100.0"],
                     ["Int","depth_confidence","0","100"],
@@ -139,6 +143,14 @@ class ZedCameraNode(object):
 
     def __init__(self):
   
+        # Try to restore camera calibration files from
+        [success,files_copied,files_not_copied] = nepi_ros.copy_files_from_folder(self.CAL_BACKUP_PATH,self.CAL_SRC_PATH)
+        if success:
+          if len(files_copied) > 0:
+            strList = str(files_copied)
+            rospy.loginfo("Restored zed cal files: " + strList)
+        else:
+          rospy.loginfo("Failed to restore zed cal files")
         # This parameter should be automatically set by idx_sensor_mgr
         self.zed_type = rospy.get_param('~self.zed_type', 'zed2')
 
@@ -293,11 +305,20 @@ class ZedCameraNode(object):
         self.logDeviceInfo()
 
         # Configure pointcloud processing Verbosity
-        pc_verbosity = nepi_pc.set_verbosity_level("Error")
-        rospy.loginfo(pc_verbosity)
+        #pc_verbosity = nepi_pc.set_verbosity_level("Error")
+        #rospy.loginfo(pc_verbosity)
 
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
         self.idx_if.updateFromParamServer()
+
+        # Try to backup camera calibration files
+        [success,files_copied,files_not_copied] = nepi_ros.copy_files_from_folder(self.CAL_SRC_PATH,self.CAL_BACKUP_PATH)
+        if success:
+           if len(files_copied) > 0:
+            strList = str(files_copied)
+            rospy.loginfo("Backed up zed cal files: " + strList)
+        else:
+          rospy.loginfo("Failed to back up up zed cal files")
 
         # Now start the node
         rospy.spin()

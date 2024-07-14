@@ -170,6 +170,7 @@ class IDXSensorMgr:
 
       elif line.startswith('/dev/video'):
         device_path = line
+        
 
         # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
         is_video_cap_device = False
@@ -198,6 +199,9 @@ class IDXSensorMgr:
         known_sensor = False
         # Check if this sensor is already known and launched
         for sensor in self.sensorList:
+          #rospy.loginfo("sensor exists check")
+          #rospy.loginfo(sensor)
+          #rospy.loginfo(active_paths)
           if sensor['sensor_class'] != 'v4l2':
             continue
 
@@ -220,6 +224,7 @@ class IDXSensorMgr:
           self.startV4L2SensorNode(type = device_type, path = device_path, bus = usbBus)
 
     # Handle sensors which no longer have a valid active V4L2 device path
+
     for sensor in self.sensorList:
       if sensor['sensor_class'] != 'v4l2':
         continue
@@ -233,7 +238,7 @@ class IDXSensorMgr:
     if type not in self.zedV4L2Devices:
       root_name = type.replace(' ','_').lower()
     else:
-      root_name = type.replace('-','').replace(' ','').lower() # e.g., ZED 2 ==> zed2 (important that it matches an existing Zed ROS Wrapper launch file)
+      root_name = type.replace('-','').replace(' ','').lower() 
 
     same_type_count = 0
     for sensor in self.sensorList:
@@ -247,25 +252,32 @@ class IDXSensorMgr:
       id = str(same_type_count)
     sensor_node_name += '_' + id
 
-    sensor_node_namespace = rospy.get_namespace() + sensor_node_name
-    rospy.loginfo(self.node_name + ": Initiating new V4L2 node " + sensor_node_namespace)
+    sensor_exists = False
+    for sensor in self.sensorList:
+      if sensor['node_name'] == sensor_node_name:
+        sensor_exists = True
 
-    self.checkLoadConfigFile(node_name = sensor_node_name)
+    if sensor_exists is False:
+      sensor_node_namespace = rospy.get_namespace() + sensor_node_name
+      rospy.loginfo(self.node_name + ": Initiating new V4L2 node " + sensor_node_namespace)
 
-    # Now start the node via rosrun
-    # rosrun nepi_edge_sdk_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
-    if type not in self.zedV4L2Devices:
-      sensor_node_run_cmd = ['rosrun', 'nepi_edge_sdk_idx', 'v4l2_camera_node.py', '__name:=' + sensor_node_name, '_device_path:='+path]
-    else:
-      sensor_node_run_cmd = ['rosrun', 'nepi_edge_sdk_idx', 'zed_camera_node.py', '__name:=' + sensor_node_name, '_zed_type:=' + root_name]
+      self.checkLoadConfigFile(node_name = sensor_node_name)
 
-    p = subprocess.Popen(sensor_node_run_cmd)
-    if p.poll() is not None:
-      rospy.logerr("Failed to start " + sensor_node_name + " via " + " ".join(x for x in sensor_node_run_cmd) + " (rc =" + str(p.returncode) + ")")
-    else:
-      self.sensorList.append({'sensor_class': 'v4l2', 'device_path': path, 'device_type': type, 
-                              'node_name': sensor_node_name, 'node_namespace': sensor_node_namespace,
-                              'node_subprocess': p})
+      # Now start the node via rosrun
+      # rosrun nepi_edge_sdk_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
+      rospy.loginfo("idx_sensor_mgr: Launching node " + sensor_node_name)
+      if type not in self.zedV4L2Devices:
+        sensor_node_run_cmd = ['rosrun', 'nepi_edge_sdk_idx', 'v4l2_camera_node.py', '__name:=' + sensor_node_name, '_device_path:='+path]
+      else:
+        sensor_node_run_cmd = ['rosrun', 'nepi_edge_sdk_idx', 'zed_camera_node.py', '__name:=' + sensor_node_name, '_zed_type:=' + root_name]
+
+      p = subprocess.Popen(sensor_node_run_cmd)
+      if p.poll() is not None:
+        rospy.logerr("Failed to start " + sensor_node_name + " via " + " ".join(x for x in sensor_node_run_cmd) + " (rc =" + str(p.returncode) + ")")
+      else:
+        self.sensorList.append({'sensor_class': 'v4l2', 'device_path': path, 'device_type': type, 
+                                'node_name': sensor_node_name, 'node_namespace': sensor_node_namespace,
+                                'node_subprocess': p})
 
   def stopAndPurgeSensorNode(self, node_namespace):
     rospy.loginfo(self.node_name + ": stopping " + node_namespace)

@@ -26,6 +26,7 @@ class V4l2CameraNode:
 
     FACTORY_SETTINGS_OVERRIDES = dict( white_balance_temperature_auto = "True",
                                     focus_auto = "True" )
+                                    
 
     #Factory Control Values 
     FACTORY_CONTROLS = dict( controls_enable = True,

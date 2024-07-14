@@ -715,6 +715,7 @@ class ROSIDXSensorIF:
         # Set up the save data and save cfg i/f and launch saving threads-- Do this before launching aquisition threads so that they can check data_product_should_save() immediately
         self.capabilities_report.data_products = str(self.data_products)
 
+
         # Start NEPI IF interfaces
         self.settings_if = SettingsIF(capSettings, factorySettings, settingUpdateFunction, getSettingsFunction)
         self.save_data_if = SaveDataIF(data_product_names = self.data_products)
@@ -729,6 +730,7 @@ class ROSIDXSensorIF:
         rospy.Service('~idx/capabilities_query', IDXCapabilitiesQuery, self.provide_capabilities)
         rospy.Service('~idx/navpose_capabilities_query', NavPoseCapabilitiesQuery, self.provide_navpose_capabilities)
 
+        
         # Start NavPose Updates
         if getGPSMsg != None or getOdomMsg != None or getHeadingMsg != None:
             rospy.Timer(rospy.Duration(self.update_navpose_interval_sec), self.navposeCb)

@@ -7,6 +7,7 @@
 #
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
+import rospy
 import sys, subprocess
 import cv2
 import threading, time
@@ -438,7 +439,16 @@ class V4l2CamDriver(object):
       key, value = line.split(':')
       value = value.strip()
       if key == 'Frames per second':
-        fps = float(value.split()[0])
+        rospy.loginfo(key)
+        rospy.loginfo(value)
+        if value.find(" ") != -1:
+          value = value.split(" ")[0]
+        rospy.loginfo(value)
+        try:
+          fps = float(value)
+        except:
+          rospy.loginfo("Failed to read camera fps from " + value)
+          fps = 0.0
         return True, fps
     
     return False, "Failed to obtain current framerate"

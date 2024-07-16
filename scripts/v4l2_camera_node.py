@@ -192,8 +192,8 @@ class V4l2CameraNode:
 
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
         
-        ### Debug
-        #self.idx_if.updateFromParamServer()
+        self.idx_if.updateFromParamServer()
+        self.idx_if.publishStatus()
 
         # Now start the node
         rospy.spin()

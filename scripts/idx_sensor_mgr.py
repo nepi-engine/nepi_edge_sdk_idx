@@ -63,7 +63,7 @@ class IDXSensorMgr:
     # been disconnected and stop the corresponding node(s).
     active_devices = {d["node_namespace"]: False for d in self.sensorList\
                                                  if d["sensor_class"] == "genicam"}
-
+    #rospy.loginfo(self.genicam_harvester.device_info_list)
     # Iterate through each device in the current context.
        
     
@@ -317,7 +317,8 @@ class IDXSensorMgr:
     return False
   
   def checkLoadConfigFile(self, node_name):
-    config_folder = os.path.join(self.NEPI_DEFAULT_CFG_PATH, node_name)
+    folder_name = "drivers/" + node_name 
+    config_folder = os.path.join(self.NEPI_DEFAULT_CFG_PATH, folder_name)
     if not os.path.isdir(config_folder):
       rospy.logwarn(self.node_name + ': No config folder found for %s... creating one at %s', node_name, config_folder)
       os.makedirs(name = config_folder, mode = 0o775)

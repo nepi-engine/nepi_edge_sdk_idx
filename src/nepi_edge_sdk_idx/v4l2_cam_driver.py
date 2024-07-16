@@ -439,8 +439,8 @@ class V4l2CamDriver(object):
       key, value = line.split(':')
       value = value.strip()
       if key == 'Frames per second':
-        rospy.loginfo(key)
-        rospy.loginfo(value)
+        #rospy.loginfo(key)
+        #rospy.loginfo(value)
         if value.find(" ") != -1:
           value = value.split(" ")[0]
         rospy.loginfo(value)

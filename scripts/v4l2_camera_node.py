@@ -138,11 +138,11 @@ class V4l2CameraNode:
 
         # Initialize settings
         self.cap_settings = self.getCapSettings()
-        rospy.loginfo("CAPS SETTINGS")
+        #rospy.loginfo("CAPS SETTINGS")
         #for setting in self.cap_settings:
             #rospy.loginfo(setting)
         self.factory_settings = self.getFactorySettings()
-        rospy.loginfo("FACTORY SETTINGS")
+        #rospy.loginfo("FACTORY SETTINGS")
         #for setting in self.factory_settings:
             #rospy.loginfo(setting)
 
@@ -227,6 +227,7 @@ class V4l2CameraNode:
                     option_ind = legend[option_name]
                     setting.append(option_name + ":" + str(option_ind))
             settings.append(setting)
+        # Add Resolution Cap Settting
         [success,available_resolutions] = self.driver.getCurrentFormatAvailableResolutions()
         setting_type = 'Discrete'
         setting_name = 'resolution'
@@ -235,6 +236,19 @@ class V4l2CameraNode:
             width = str(res_dict['width'])
             height = str(res_dict['height'])
             setting_option = (width + ":" + height)
+            setting.append(setting_option)
+        settings.append(setting)
+        # Add Framerate Cap Setting
+        [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
+        framerates_list = []
+        for framerate in framerates:
+            if framerate not in framerates_list:
+                framerates_list.append(framerate)
+        setting_type = 'Discrete'
+        setting_name = 'framerate'
+        setting=[setting_type,setting_name]
+        for framerate in framerates_list:
+            setting_option = str(framerate)
             setting.append(setting_option)
         settings.append(setting)
         return settings
@@ -266,6 +280,7 @@ class V4l2CameraNode:
                 setting_default = str(info['default'])
             setting = [setting_type,setting_name,setting_default]
             settings.append(setting)
+        # Resolution
         [success,res_dict] = self.driver.getCurrentResolution()
         setting_type = 'Discrete'
         setting_name = 'resolution'
@@ -273,6 +288,14 @@ class V4l2CameraNode:
         width = str(res_dict['width'])
         height = str(res_dict['height'])
         setting_option = (width + ":" + height)
+        setting.append(setting_option)
+        settings.append(setting)
+        # Framerate
+        [success,framerate] = self.driver.getFramerate()
+        setting_type = 'Discrete'
+        setting_name = 'framerate'
+        setting=[setting_type,setting_name]
+        setting_option = str(framerate)
         setting.append(setting_option)
         settings.append(setting)
         #Apply factory setting overides
@@ -313,6 +336,7 @@ class V4l2CameraNode:
                 setting_current = str(info['value'])
             setting = [setting_type,setting_name,setting_current]
             settings.append(setting)
+        # Resolution
         [success,res_dict] = self.driver.getCurrentResolution()
         setting_type = 'Discrete'
         setting_name = 'resolution'
@@ -320,6 +344,14 @@ class V4l2CameraNode:
         width = str(res_dict['width'])
         height = str(res_dict['height'])
         setting_option = (width + ":" + height)
+        setting.append(setting_option)
+        settings.append(setting)
+        # Framerate
+        [success,framerate] = self.driver.getFramerate()
+        setting_type = 'Discrete'
+        setting_name = 'framerate'
+        setting=[setting_type,setting_name]
+        setting_option = str(framerate)
         setting.append(setting_option)
         settings.append(setting)
         return settings
@@ -337,11 +369,11 @@ class V4l2CameraNode:
                 for cap_setting in self.cap_settings:
                     if setting_name in cap_setting:
                         found_setting = True
-                        if setting_name != "resolution":
+                        if setting_name != "resolution" and setting_name != "framerate":
                             success, msg = self.driver.setCameraControl(setting_name,setting_data)
                             if success:
                                 msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-                        else:
+                        elif setting_name == "resolution":
                             if data.find("(") == -1 and data.find(")") == -1: # Make sure not a function call
                                 data = data.split(":")
                                 width = int(eval(data[0]))
@@ -351,6 +383,13 @@ class V4l2CameraNode:
                             else:
                                 msg = (self.node_name  + " Setting value" + setting_str + " contained () chars") 
                             break     
+                        elif setting_name == "framerate":
+                            try:
+                                framerate = float(data)
+                                success, msg = self.driver.setFramerate(framerate)
+                            except Exception as e:
+                                rospy.loginfo("Framerate setting: " + data + " could not be parsed to float " + str(e))
+                            break    
                 if found_setting is False:
                     msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
             else:

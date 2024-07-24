@@ -8,6 +8,8 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 import sys
+import rospy
+import math
 import cv2
 from copy import deepcopy
 import time
@@ -322,13 +324,10 @@ class GenicamCamDriver(object):
 
     def getCurrentResolutionAvailableFramerates(self):
         NUM_OPTIONS = 20
-        available_framerates = [x for x in np.linspace(
-            self.camera_settings["AcquisitionFrameRate"]["min"],
-            self.camera_settings["AcquisitionFrameRate"]["max"],
-            NUM_OPTIONS
-        )]
-        DBG_PRINT(available_framerates)
-        return True, available_framerates
+        available_framerates = [self.camera_settings["AcquisitionFrameRate"]["min"],self.camera_settings["AcquisitionFrameRate"]["max"]]
+        framerates = [math.ceil(available_framerates[0]), math.floor(available_framerates[1])]
+        DBG_PRINT(framerates)
+        return True, framerates
 
     def setFramerate(self, max_fps):
         if not self.hasAdjustableFramerate():
@@ -337,12 +336,18 @@ class GenicamCamDriver(object):
         fps_too_high = max_fps > self.camera_settings["AcquisitionFrameRate"]["max"]
         if fps_too_low or fps_too_high:
             return False, "Invalid framerate requested"
-        return self._setNodeVal("AcquisitionFrameRate", max_fps)
+        ret = self._setNodeVal("AcquisitionFrameRate", max_fps)
+        #rospy.loginfo("GenC_Driver: Set Framerate")
+        #rospy.loginfo(ret)
+        return ret
 
     def getFramerate(self):
         if "AcquisitionFrameRate" not in self.camera_settings:
             return False, "Camera does not provide framerate information"
-        return self._getNodeVal("AcquisitionFrameRate")
+        ret = self._getNodeVal("AcquisitionFrameRate")
+        #rospy.loginfo("GenC_Driver: Get Framerate")
+        #rospy.loginfo(ret)
+        return ret[1],round(ret[0],2)
 
     def getCurrentFormat(self):
         return self._getNodeVal("PixelFormat")

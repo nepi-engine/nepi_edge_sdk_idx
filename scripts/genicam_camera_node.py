@@ -224,15 +224,26 @@ class GenicamCameraNode:
                 for option in options:
                     setting.append(option)
             settings.append(setting)
+        # Add Resolution Cap Settting
         [success,available_resolutions] = self.driver.getCurrentFormatAvailableResolutions()
         setting_type = 'Discrete'
-        setting_name = 'resolution'
+        setting_name = 'Resolution'
         setting=[setting_type,setting_name]
         for res_dict in available_resolutions:
             width = str(res_dict['width'])
             height = str(res_dict['height'])
             setting_option = (width + ":" + height)
             setting.append(setting_option)
+        settings.append(setting)
+        # Add Framerate Cap Setting
+        [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
+        setting_type = 'Float'
+        setting_name = 'Framerate'
+        setting=[setting_type,setting_name]
+        setting_option = (str(round(framerates[0],0)))
+        setting.append(setting_option)
+        setting_option = (str(round(framerates[1],0)))
+        setting.append(setting_option)
         settings.append(setting)
         return settings
 
@@ -267,13 +278,22 @@ class GenicamCameraNode:
                 setting_value = str(info['value'])
             setting = [setting_type,setting_name,setting_value]
             settings.append(setting)
+        # Resolution
         [success,res_dict] = self.driver.getCurrentResolution()
         setting_type = 'Discrete'
-        setting_name = 'resolution'
+        setting_name = 'Resolution'
         setting=[setting_type,setting_name]
         width = str(res_dict['width'])
         height = str(res_dict['height'])
         setting_option = (width + ":" + height)
+        setting.append(setting_option)
+        settings.append(setting)
+        # Framerate
+        [success,framerate] = self.driver.getFramerate()
+        setting_type = 'Float'
+        setting_name = 'Framerate'
+        setting=[setting_type,setting_name]
+        setting_option = (str(round(framerate,2)))
         setting.append(setting_option)
         settings.append(setting)
         return settings
@@ -291,11 +311,11 @@ class GenicamCameraNode:
                 for cap_setting in self.cap_settings:
                     if setting_name in cap_setting:
                         found_setting = True
-                        if setting_name != "resolution":
+                        if setting_name != "Resolution" and setting_name != "Framerate":
                             success, msg = self.driver.setCameraControl(setting_name,setting_data)
                             if success:
                                 msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-                        else:
+                        elif setting_name == "Resolution":
                             if data.find("(") == -1 and data.find(")") == -1: # Make sure not a function call
                                 data = data.split(":")
                                 width = int(eval(data[0]))
@@ -303,8 +323,15 @@ class GenicamCameraNode:
                                 res_dict = {'width': width, 'height': height}
                                 success, msg = self.driver.setResolution(res_dict)
                             else:
-                                msg = (self.node_name  + " Setting value" + setting_str + " contained () chars")    
-                        break  
+                                msg = (self.node_name  + " Setting value" + setting_str + " contained () chars") 
+                            break     
+                        elif setting_name == "Framerate":
+                            try:
+                                framerate = float(data)
+                                success, msg = self.driver.setFramerate(framerate)
+                            except Exception as e:
+                                rospy.loginfo("Framerate setting: " + data + " could not be parsed to float " + str(e))
+                            break    
                 if found_setting is False:
                     msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
             else:

@@ -14,8 +14,8 @@ import rospy
 import threading
 import cv2
 
-from nepi_edge_sdk_idx.idx_sensor_if import ROSIDXSensorIF
-from nepi_edge_sdk_idx.genicam_cam_driver import GENICAM_GENERIC_DRIVER_ID, GenicamCamDriver
+from nepi_drivers_idx.idx_sensor_if import ROSIDXSensorIF
+from nepi_drivers_idx.genicam_cam_driver import GENICAM_GENERIC_DRIVER_ID, GenicamCamDriver
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_img

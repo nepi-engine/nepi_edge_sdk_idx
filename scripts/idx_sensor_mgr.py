@@ -129,7 +129,7 @@ class IDXSensorMgr:
 
     # NOTE: have to make serial_number look like a string by prefixing with "sn", otherwise ROS
     #       treats it as an int param and it causes an overflow. Better way to handle this?
-    sensor_node_run_cmd = ["rosrun", "nepi_edge_sdk_idx", "genicam_camera_node.py",
+    sensor_node_run_cmd = ["rosrun", "nepi_drivers_idx", "genicam_camera_node.py",
         f"__name:={sensor_node_name}", f"_model:={model}", f"_serial_number:=sn{serial_number}"]
     p = subprocess.Popen(sensor_node_run_cmd)
     if p.poll() is not None:
@@ -264,12 +264,12 @@ class IDXSensorMgr:
       self.checkLoadConfigFile(node_name = sensor_node_name)
 
       # Now start the node via rosrun
-      # rosrun nepi_edge_sdk_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
+      # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
       rospy.loginfo("idx_sensor_mgr: Launching node " + sensor_node_name)
       if type not in self.zedV4L2Devices:
-        sensor_node_run_cmd = ['rosrun', 'nepi_edge_sdk_idx', 'v4l2_camera_node.py', '__name:=' + sensor_node_name, '_device_path:='+path]
+        sensor_node_run_cmd = ['rosrun', 'nepi_drivers_idx', 'v4l2_camera_node.py', '__name:=' + sensor_node_name, '_device_path:='+path]
       else:
-        sensor_node_run_cmd = ['rosrun', 'nepi_edge_sdk_idx', 'zed_camera_node.py', '__name:=' + sensor_node_name, '_zed_type:=' + root_name]
+        sensor_node_run_cmd = ['rosrun', 'nepi_drivers_idx', 'zed_camera_node.py', '__name:=' + sensor_node_name, '_zed_type:=' + root_name]
 
       p = subprocess.Popen(sensor_node_run_cmd)
       if p.poll() is not None:

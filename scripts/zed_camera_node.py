@@ -24,7 +24,7 @@ import dynamic_reconfigure.client
 import numpy as np
 import tf
 
-from nepi_edge_sdk_idx.idx_sensor_if import ROSIDXSensorIF
+from nepi_drivers_idx.idx_sensor_if import ROSIDXSensorIF
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_nav

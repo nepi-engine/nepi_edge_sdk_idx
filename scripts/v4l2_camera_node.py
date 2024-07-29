@@ -14,8 +14,8 @@ import rospy
 import threading
 import cv2
 
-from nepi_edge_sdk_idx.idx_sensor_if import ROSIDXSensorIF
-from nepi_edge_sdk_idx.v4l2_cam_driver import V4L2_GENERIC_DRIVER_ID, V4l2CamDriver
+from nepi_drivers_idx.idx_sensor_if import ROSIDXSensorIF
+from nepi_drivers_idx.v4l2_cam_driver import V4L2_GENERIC_DRIVER_ID, V4l2CamDriver
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_img

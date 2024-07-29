@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>nepi_edge_sdk_idx</name>
+  <name>nepi_drivers_idx</name>
   <version>0.0.0</version>
-  <description>The nepi_edge_sdk_idx package</description>
+  <description>The nepi_drivers_idx package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->

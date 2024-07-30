@@ -164,7 +164,15 @@ class ZedCameraNode(object):
         ZED_BASE_NAMESPACE = rospy.get_namespace() + self.zed_type + "/zed_node/"
 
         # Now that Zed SDK is started, we can set up the reconfig client
-        self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=30)
+        nepi_ros.sleep(2,10)
+        success = False
+        while success == False:
+          try:
+            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=30)
+            success = True
+          except Exception as e:
+            rospy.loginfo(str(e))
+            nepi_ros.sleep(1,10)
 
 
         # Zed control topics
@@ -430,6 +438,7 @@ class ZedCameraNode(object):
     def logDeviceInfo(self):
         device_info_str = self.node_name + " info:\n"
         rospy.loginfo(device_info_str)
+        rospy.loginfo(self.device_info_dict)
 
     def setControlsEnable(self, enable):
         self.current_controls["controls_enable"] = enable

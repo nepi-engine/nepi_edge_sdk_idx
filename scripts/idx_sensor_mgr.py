@@ -267,7 +267,7 @@ class IDXSensorMgr:
       # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
       rospy.loginfo("idx_sensor_mgr: Launching node " + sensor_node_name)
       if type not in self.zedV4L2Devices:
-        sensor_node_run_cmd = ['rosrun', 'nepi_drivers_idx', 'v4l2_camera_node.py', '__name:=' + sensor_node_name, '_device_path:='+path]
+        sensor_node_run_cmd = ['rosrun', 'nepi_drivers_idx', 'v4l2_camera_node.py', '__name:=' + sensor_node_name, '_device_path:=' + path]
       else:
         sensor_node_run_cmd = ['rosrun', 'nepi_drivers_idx', 'zed_camera_node.py', '__name:=' + sensor_node_name, '_zed_type:=' + root_name]
 

@@ -376,8 +376,15 @@ class V4l2CamDriver(object):
       for resolution in entry['resolutions']:
         if (resolution["width"] == curr_video_settings["width"]) and (resolution["height"] == curr_video_settings["height"]):
           framerates = list(resolution["framerates"])
-          framerates.sort()
-          return True, framerates
+          #if (min(framerates) > 5):
+            #framerates.append(5.0)
+          # Remove Duplicates
+          framerates_list = []       
+          for framerate in framerates:
+              if framerate not in framerates_list:
+                  framerates_list.append(framerate)
+          framerates_list.sort()
+          return True, framerates_list
         
     return False, "Failed to identify framerates for current resolution"
 
@@ -427,9 +434,9 @@ class V4l2CamDriver(object):
     if status is False:
       return False, "Unable to check current framerate during update"
     
-    if max_fps != curr_fps:
-      return False, "Framerate did not update"
-
+    #if max_fps != curr_fps:
+      #return False, "Framerate did not update"
+    
     #rospy.loginfo("V4l2_Driver: Get Check in Set framerate value: " + str(curr_fps))
     return True, ""
 

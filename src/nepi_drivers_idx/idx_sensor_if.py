@@ -107,7 +107,8 @@ class ROSIDXSensorIF:
         self.resetFactory()
 
     def resetFactory(self):
-        self.settings_if.resetFactorySettings()
+        if self.settings_if is not None:
+            self.settings_if.resetFactorySettings(update_status = False, update_params = True)
         rospy.set_param('~idx/device_name', self.factory_device_name)
         rospy.set_param('~idx/auto', self.factory_controls.get('auto_adjust'))  
         rospy.set_param('~idx/brightness', self.factory_controls.get('brightness_ratio'))      
@@ -123,7 +124,6 @@ class ROSIDXSensorIF:
         self.rotate_ratio = self.init_rotate_ratio
         self.tilt_ratio = self.init_rotate_ratio
         self.render_controls = [self.zoom_ratio,self.rotate_ratio,self.tilt_ratio]
-        self.updateFromParamServer()
         self.publishStatus()
 
     def updateDeviceNameCb(self, msg):
@@ -161,9 +161,9 @@ class ROSIDXSensorIF:
     def resetControlsCb(self, msg):
         rospy.loginfo(msg)
         rospy.loginfo("Resetting IDX Sensor Controls")
-        self.resetParamServer()
+        self.resetParamServer(do_updates = True)
 
-    def resetParamServer(self,do_updates = True):
+    def resetParamServer(self,do_updates = False):
         rospy.set_param('~idx/device_name', self.init_device_name)
         rospy.set_param('~idx/auto', self.init_auto_adjust)       
         rospy.set_param('~idx/brightness', self.init_brightness_ratio)
@@ -183,7 +183,9 @@ class ROSIDXSensorIF:
             self.updateFromParamServer()
             self.publishStatus()
 
-    def initializeParamServer(self,do_updates = True):
+    def initializeParamServer(self,do_updates = False):
+        if self.settings_if is not None:
+            self.settings_if.initializeParamServer(do_updates)
         self.init_device_name = rospy.get_param('~idx/device_name', self.factory_device_name)
         self.init_controls_enable = rospy.get_param('~idx/controls_enable',  self.factory_controls["controls_enable"])
         self.init_auto_adjust = rospy.get_param('~idx/auto',  self.factory_controls["auto_adjust"])
@@ -211,10 +213,10 @@ class ROSIDXSensorIF:
         self.resetParamServer(do_updates)
 
     def updateFromParamServer(self):
-        param_dict = rospy.get_param('~idx', {})
-        #rospy.logwarn("Debugging: param_dict = " + str(param_dict))
         if self.settings_if is not None:
             self.settings_if.updateFromParamServer()
+        param_dict = rospy.get_param('~idx', {})
+        #rospy.logwarn("IDX_IF: param_dict = " + str(param_dict))
         if (self.setControlsEnable is not None and 'controls_enable' in param_dict):
             self.setControlsEnable(param_dict['controls_enable'])
         if (self.setAutoAdjust is not None and 'auto_adjust' in param_dict):
@@ -231,6 +233,8 @@ class ROSIDXSensorIF:
             self.setFramerateMode(param_dict['framerate_mode'])
         if (self.setRange is not None and 'start_range' in param_dict and 'stop_range' in param_dict):
             self.setRange(param_dict['range_window']['start_range'], param_dict['range_window']['stop_range'])
+
+
 
     # Define local IDX Control callbacks
     def setControlsEnableCb(self, msg):

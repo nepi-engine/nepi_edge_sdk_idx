@@ -61,6 +61,7 @@ class V4l2CameraNode:
     bw_image_acquisition_running = False
     cached_2d_color_image = None
     cached_2d_color_image_timestamp = None
+    set_framerate = 0
 
     def __init__(self):
         # Launch the ROS node
@@ -189,9 +190,10 @@ class V4l2CameraNode:
 
         # Update available IDX callbacks based on capabilities that the driver reports
         self.logDeviceInfo()
-
+        time.sleep(1)
+        self.getColorImg()
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
-        
+        time.sleep(1)
         self.idx_if.updateFromParamServer()
         self.idx_if.publishStatus()
 
@@ -240,14 +242,10 @@ class V4l2CameraNode:
         settings.append(setting)
         # Add Framerate Cap Setting
         [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
-        framerates_list = []
-        for framerate in framerates:
-            if framerate not in framerates_list:
-                framerates_list.append(framerate)
         setting_type = 'Discrete'
         setting_name = 'framerate'
         setting=[setting_type,setting_name]
-        for framerate in framerates_list:
+        for framerate in framerates:
             setting_option = str(framerate)
             setting.append(setting_option)
         settings.append(setting)
@@ -280,6 +278,7 @@ class V4l2CameraNode:
                 setting_default = str(info['default'])
             setting = [setting_type,setting_name,setting_default]
             settings.append(setting)
+        '''
         # Resolution
         [success,res_dict] = self.driver.getCurrentResolution()
         setting_type = 'Discrete'
@@ -291,13 +290,22 @@ class V4l2CameraNode:
         setting.append(setting_option)
         settings.append(setting)
         # Framerate
-        [success,framerate] = self.driver.getFramerate()
+        framerate_caps = nepi_ros.get_setting_from_settings('framerate',self.cap_settings)
+        framerate = 0
+        loop = 0
+        while(framerate not in framerate_caps and loop < 5):
+            [success,framerate] = self.driver.getFramerate()
+            time.sleep(.1)
+            loop += 1
+        if loop == 5:
+            framerate = framerate_caps[-1]
         setting_type = 'Discrete'
         setting_name = 'framerate'
         setting=[setting_type,setting_name]
         setting_option = str(framerate)
         setting.append(setting_option)
         settings.append(setting)
+        '''
         #Apply factory setting overides
         for setting in settings:
             if setting[1] in self.FACTORY_SETTINGS_OVERRIDES:
@@ -347,7 +355,8 @@ class V4l2CameraNode:
         setting.append(setting_option)
         settings.append(setting)
         # Framerate
-        [success,framerate] = self.driver.getFramerate()
+        framerate_caps = nepi_ros.get_setting_from_settings('framerate',self.cap_settings)
+        [success,framerate] = self.driver.getFramerate() 
         setting_type = 'Discrete'
         setting_name = 'framerate'
         setting=[setting_type,setting_name]
@@ -387,6 +396,7 @@ class V4l2CameraNode:
                             try:
                                 framerate = float(data)
                                 success, msg = self.driver.setFramerate(framerate)
+                                self.set_framerate = framerate
                             except Exception as e:
                                 rospy.loginfo("Framerate setting: " + data + " could not be parsed to float " + str(e))
                             break    
